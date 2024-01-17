@@ -12,15 +12,27 @@ fn start() -> Result<(), JsValue> {
     canvas.set_width(640);
     canvas.set_height(480);
     canvas.style().set_property("border", "solid")?;
+    let initial_line_width = 3;
     
     let controls_div = document.create_element("div")?.dyn_into::<web_sys::HtmlDivElement>()?;
     document.body().unwrap().append_child(&controls_div)?;
+
     let color_picker_input = document.create_element("input")?.dyn_into::<web_sys::HtmlInputElement>()?;
     color_picker_input.set_type("color");
     let color_picker_label = document.create_element("label")?.dyn_into::<web_sys::HtmlLabelElement>()?;
     color_picker_label.set_inner_text("Pick a color");
     controls_div.append_child(&color_picker_input)?;
     controls_div.append_child(&color_picker_label)?;
+    
+    let line_width_input = document.create_element("input")?.dyn_into::<web_sys::HtmlInputElement>()?;
+    line_width_input.set_type("range");
+    line_width_input.set_min("1");
+    line_width_input.set_max("10");
+    line_width_input.set_value(initial_line_width.to_string().as_str());
+    let line_width_label = document.create_element("label")?.dyn_into::<web_sys::HtmlLabelElement>()?;
+    line_width_label.set_inner_text("Select stroke width");
+    controls_div.append_child(&line_width_input)?;
+    controls_div.append_child(&line_width_label)?;
 
     let context = canvas
         .get_context("2d")?
@@ -40,6 +52,20 @@ fn start() -> Result<(), JsValue> {
             context.set_stroke_style(&wasm_bindgen::JsValue::from_str(&input.value()));
         });
         color_picker_input.add_event_listener_with_callback("change", closure.as_ref().unchecked_ref())?;
+
+        closure.forget();
+    }
+    {
+        let context = context.clone();
+        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::InputEvent| {
+            let input = event
+                .current_target()
+                .unwrap()
+                .dyn_into::<web_sys::HtmlInputElement>()
+                .unwrap();
+            context.set_line_width(input.value().parse::<f64>().unwrap());
+        });
+        line_width_input.add_event_listener_with_callback("change", closure.as_ref().unchecked_ref())?;
 
         closure.forget();
     }
