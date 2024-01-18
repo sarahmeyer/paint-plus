@@ -12,7 +12,7 @@ fn start() -> Result<(), JsValue> {
     let initial_line_width = 3;
 
     let document = window().unwrap().document().unwrap();
-    let canvas = document
+    let canvas: HtmlCanvasElement = document
         .create_element("canvas")?
         .dyn_into::<HtmlCanvasElement>()?;
     document.body().unwrap().append_child(&canvas)?;
@@ -25,7 +25,7 @@ fn start() -> Result<(), JsValue> {
         .dyn_into::<HtmlDivElement>()?;
     document.body().unwrap().append_child(&controls_div)?;
 
-    let color_picker_input = document
+    let color_picker_input: HtmlInputElement = document
         .create_element("input")?
         .dyn_into::<HtmlInputElement>()?;
     color_picker_input.set_type("color");
@@ -50,7 +50,13 @@ fn start() -> Result<(), JsValue> {
     controls_div.append_child(&line_width_input)?;
     controls_div.append_child(&line_width_label)?;
 
-    let context = canvas
+    let load_image_button: HtmlButtonElement = document
+        .create_element("button")?
+        .dyn_into::<HtmlButtonElement>()?;
+    load_image_button.set_inner_text("Load Image");
+    controls_div.append_child(&load_image_button)?;
+
+    let context: CanvasRenderingContext2d = canvas
         .get_context("2d")?
         .unwrap()
         .dyn_into::<CanvasRenderingContext2d>()?;
@@ -65,19 +71,39 @@ fn start() -> Result<(), JsValue> {
         .unwrap()
         .dyn_into::<HtmlImageElement>()
         .unwrap();
+
     {
         let context = context.clone();
         let closure = Closure::<dyn FnMut(_)>::new(move |_event: Event| {
+            console::log_1(&"image onload".into());
+            // context
+            //     .draw_image_with_html_image_element(&image_el, 0.0, 0.0)
+            //     .unwrap();
+        });
+        image_el.add_event_listener_with_callback("onload", closure.as_ref().unchecked_ref())?;
+        closure.forget();
+    }
+    {
+        // let context = context.clone();
+        let closure = Closure::<dyn FnMut(_)>::new(move |_event: Event| {
+            console::log_1(&"load".into());
             let local_window = web_sys::window().unwrap();
             let local_storage = local_window.local_storage().unwrap().unwrap();
             if let Some(stored_image) = local_storage.get_item(storage_key).unwrap() {
+                console::log_1(&"in if".into());
                 image_el.set_src(&stored_image);
-                context
-                    .draw_image_with_html_image_element(&image_el, 0.0, 0.0)
-                    .unwrap();
+                // move this draw image call to a load event on the image element
+                // context
+                //     .draw_image_with_html_image_element(&image_el, 0.0, 0.0)
+                //     .unwrap();
             }
+            console::log_1(&"after load".into());
         });
-        document.add_event_listener_with_callback("load", closure.as_ref().unchecked_ref())?;
+        load_image_button
+            .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())?;
+        // window()
+        //     .expect("we should be able to access window")
+        //     .add_event_listener_with_callback("load", closure.as_ref().unchecked_ref())?;
         closure.forget();
     }
     {
@@ -144,7 +170,7 @@ fn start() -> Result<(), JsValue> {
                 let local_storage = local_window.local_storage().unwrap().unwrap();
                 let image_data_url = canvas.to_data_url();
                 if let Err(e) =
-                    local_storage.set_item(storage_key, image_data_url.unwrap().as_str())
+                    local_storage.set_item(storage_key, &image_data_url.unwrap().as_str())
                 {
                     console::log_1(&e);
                 }

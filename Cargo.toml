@@ -19,6 +19,7 @@ features = [
   'Document',
   'Element',
   'EventTarget',
+  'HtmlButtonElement',
   'HtmlCanvasElement',
   'HtmlDivElement',
   'HtmlImageElement',
