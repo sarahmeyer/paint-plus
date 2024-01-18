@@ -1,35 +1,51 @@
+use js_sys::*;
 use std::cell::Cell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
+use web_sys::*;
 
 #[wasm_bindgen(start)]
 fn start() -> Result<(), JsValue> {
-    let document = web_sys::window().unwrap().document().unwrap();
+    let storage_key = "paint-plus";
+    let width = 640;
+    let height = 480;
+    let initial_line_width = 3;
+
+    let document = window().unwrap().document().unwrap();
     let canvas = document
         .create_element("canvas")?
-        .dyn_into::<web_sys::HtmlCanvasElement>()?;
+        .dyn_into::<HtmlCanvasElement>()?;
     document.body().unwrap().append_child(&canvas)?;
-    canvas.set_width(640);
-    canvas.set_height(480);
+    canvas.set_width(width);
+    canvas.set_height(height);
     canvas.style().set_property("border", "solid")?;
-    let initial_line_width = 3;
-    
-    let controls_div = document.create_element("div")?.dyn_into::<web_sys::HtmlDivElement>()?;
+
+    let controls_div: HtmlDivElement = document
+        .create_element("div")?
+        .dyn_into::<HtmlDivElement>()?;
     document.body().unwrap().append_child(&controls_div)?;
 
-    let color_picker_input = document.create_element("input")?.dyn_into::<web_sys::HtmlInputElement>()?;
+    let color_picker_input = document
+        .create_element("input")?
+        .dyn_into::<HtmlInputElement>()?;
     color_picker_input.set_type("color");
-    let color_picker_label = document.create_element("label")?.dyn_into::<web_sys::HtmlLabelElement>()?;
+    let color_picker_label = document
+        .create_element("label")?
+        .dyn_into::<HtmlLabelElement>()?;
     color_picker_label.set_inner_text("Pick a color");
     controls_div.append_child(&color_picker_input)?;
     controls_div.append_child(&color_picker_label)?;
-    
-    let line_width_input = document.create_element("input")?.dyn_into::<web_sys::HtmlInputElement>()?;
+
+    let line_width_input = document
+        .create_element("input")?
+        .dyn_into::<HtmlInputElement>()?;
     line_width_input.set_type("range");
     line_width_input.set_min("1");
     line_width_input.set_max("10");
     line_width_input.set_value(initial_line_width.to_string().as_str());
-    let line_width_label = document.create_element("label")?.dyn_into::<web_sys::HtmlLabelElement>()?;
+    let line_width_label = document
+        .create_element("label")?
+        .dyn_into::<HtmlLabelElement>()?;
     line_width_label.set_inner_text("Select stroke width");
     controls_div.append_child(&line_width_input)?;
     controls_div.append_child(&line_width_label)?;
@@ -37,42 +53,68 @@ fn start() -> Result<(), JsValue> {
     let context = canvas
         .get_context("2d")?
         .unwrap()
-        .dyn_into::<web_sys::CanvasRenderingContext2d>()?;
+        .dyn_into::<CanvasRenderingContext2d>()?;
     let context = Rc::new(context);
     let pressed = Rc::new(Cell::new(false));
+
+    context.set_line_cap("round");
+    context.set_line_join("round");
+
+    let image_el = document
+        .create_element("img")
+        .unwrap()
+        .dyn_into::<HtmlImageElement>()
+        .unwrap();
     {
         let context = context.clone();
-        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::InputEvent| {
+        let closure = Closure::<dyn FnMut(_)>::new(move |_event: Event| {
+            let local_window = web_sys::window().unwrap();
+            let local_storage = local_window.local_storage().unwrap().unwrap();
+            if let Some(stored_image) = local_storage.get_item(storage_key).unwrap() {
+                image_el.set_src(&stored_image);
+                context
+                    .draw_image_with_html_image_element(&image_el, 0.0, 0.0)
+                    .unwrap();
+            }
+        });
+        document.add_event_listener_with_callback("load", closure.as_ref().unchecked_ref())?;
+        closure.forget();
+    }
+    {
+        let context = context.clone();
+        let closure = Closure::<dyn FnMut(_)>::new(move |event: InputEvent| {
             let input = event
                 .current_target()
                 .unwrap()
-                .dyn_into::<web_sys::HtmlInputElement>()
+                .dyn_into::<HtmlInputElement>()
                 .unwrap();
-            // web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(event.data()));
-            context.set_stroke_style(&wasm_bindgen::JsValue::from_str(&input.value()));
+            // console::log_1(&wasm_bindgen::JsValue::from_str(event.data()));
+            context.set_stroke_style(&wasm_bindgen::JsValue::from_str(input.value().as_str()));
         });
-        color_picker_input.add_event_listener_with_callback("change", closure.as_ref().unchecked_ref())?;
+        color_picker_input
+            .add_event_listener_with_callback("change", closure.as_ref().unchecked_ref())?;
 
         closure.forget();
     }
     {
         let context = context.clone();
-        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::InputEvent| {
+        let closure = Closure::<dyn FnMut(_)>::new(move |event: InputEvent| {
             let input = event
                 .current_target()
                 .unwrap()
-                .dyn_into::<web_sys::HtmlInputElement>()
+                .dyn_into::<HtmlInputElement>()
                 .unwrap();
             context.set_line_width(input.value().parse::<f64>().unwrap());
         });
-        line_width_input.add_event_listener_with_callback("change", closure.as_ref().unchecked_ref())?;
+        line_width_input
+            .add_event_listener_with_callback("change", closure.as_ref().unchecked_ref())?;
 
         closure.forget();
     }
     {
         let context = context.clone();
         let pressed = pressed.clone();
-        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::MouseEvent| {
+        let closure = Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
             context.begin_path();
             context.move_to(event.offset_x() as f64, event.offset_y() as f64);
             pressed.set(true);
@@ -83,7 +125,7 @@ fn start() -> Result<(), JsValue> {
     {
         let context = context.clone();
         let pressed = pressed.clone();
-        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::MouseEvent| {
+        let closure = Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
             if pressed.get() {
                 context.line_to(event.offset_x() as f64, event.offset_y() as f64);
                 context.stroke();
@@ -95,10 +137,25 @@ fn start() -> Result<(), JsValue> {
         closure.forget();
     }
     {
-        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::MouseEvent| {
+        let save = {
+            let canvas = canvas.clone();
+            move || {
+                let local_window = web_sys::window().unwrap();
+                let local_storage = local_window.local_storage().unwrap().unwrap();
+                let image_data_url = canvas.to_data_url();
+                if let Err(e) =
+                    local_storage.set_item(storage_key, image_data_url.unwrap().as_str())
+                {
+                    console::log_1(&e);
+                }
+            }
+        };
+        let closure = Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
             pressed.set(false);
             context.line_to(event.offset_x() as f64, event.offset_y() as f64);
             context.stroke();
+
+            save();
         });
         canvas.add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())?;
         closure.forget();
