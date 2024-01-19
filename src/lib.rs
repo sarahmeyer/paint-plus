@@ -73,18 +73,22 @@ fn start() -> Result<(), JsValue> {
         .dyn_into::<HtmlImageElement>()
         .unwrap();
 
-    // {
-    //     let context = context.clone();
-    //     let closure = Closure::<dyn FnMut(_)>::new(move |_event: Event| {
-    //         console::log_1(&"image onload".into());
-    //         let image_el_by_id = document.query_selector(&id).unwrap()?;
-    //         context
-    //             .draw_image_with_html_image_element(&image_el_by_id, 0.0, 0.0)
-    //             .unwrap();
-    //     });
-    //     image_el.add_event_listener_with_callback("onload", closure.as_ref().unchecked_ref())?;
-    //     closure.forget();
-    // }
+    {
+        let context = context.clone();
+        let closure = Closure::<dyn FnMut(_)>::new(move |event: Event| {
+            console::log_1(&"image onload".into());
+            let image_el_from_event = event
+                .current_target()
+                .unwrap()
+                .dyn_into::<HtmlImageElement>()
+                .unwrap();
+            context
+                .draw_image_with_html_image_element(&image_el_from_event, 0.0, 0.0)
+                .unwrap();
+        });
+        image_el.add_event_listener_with_callback("load", closure.as_ref().unchecked_ref())?;
+        closure.forget();
+    }
     {
         let context = context.clone();
         let closure: Closure<dyn FnMut(Event)> =
@@ -104,9 +108,7 @@ fn start() -> Result<(), JsValue> {
             });
         load_image_button
             .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())?;
-        // window()
-        //     .expect("we should be able to access window")
-        //     .add_event_listener_with_callback("load", closure.as_ref().unchecked_ref())?;
+        document.add_event_listener_with_callback("load", closure.as_ref().unchecked_ref())?;
         closure.forget();
     }
     {
