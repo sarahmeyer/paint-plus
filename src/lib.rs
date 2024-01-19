@@ -51,12 +51,6 @@ fn start() -> Result<(), JsValue> {
     controls_div.append_child(&line_width_input)?;
     controls_div.append_child(&line_width_label)?;
 
-    let load_image_button: HtmlButtonElement = document
-        .create_element("button")?
-        .dyn_into::<HtmlButtonElement>()?;
-    load_image_button.set_inner_text("Load Image");
-    controls_div.append_child(&load_image_button)?;
-
     let context: CanvasRenderingContext2d = canvas
         .get_context("2d")?
         .unwrap()
@@ -73,6 +67,12 @@ fn start() -> Result<(), JsValue> {
         .dyn_into::<HtmlImageElement>()
         .unwrap();
 
+    let local_storage = window().unwrap().local_storage().unwrap().unwrap();
+    if let Some(stored_image) = local_storage.get_item(storage_key).unwrap() {
+        console::log_1(&"in if".into());
+        image_el.set_src(&stored_image);
+    }
+
     {
         let context = context.clone();
         let closure = Closure::<dyn FnMut(_)>::new(move |event: Event| {
@@ -87,28 +87,6 @@ fn start() -> Result<(), JsValue> {
                 .unwrap();
         });
         image_el.add_event_listener_with_callback("load", closure.as_ref().unchecked_ref())?;
-        closure.forget();
-    }
-    {
-        let context = context.clone();
-        let closure: Closure<dyn FnMut(Event)> =
-            Closure::<dyn FnMut(_)>::new(move |_event: Event| {
-                console::log_1(&"load".into());
-                let local_window = web_sys::window().unwrap();
-                let local_storage = local_window.local_storage().unwrap().unwrap();
-                if let Some(stored_image) = local_storage.get_item(storage_key).unwrap() {
-                    console::log_1(&"in if".into());
-                    image_el.set_src(&stored_image);
-                    // move this draw image call to a load event on the image element
-                    context
-                        .draw_image_with_html_image_element(&image_el, 0.0, 0.0)
-                        .unwrap();
-                }
-                console::log_1(&"after load".into());
-            });
-        load_image_button
-            .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())?;
-        document.add_event_listener_with_callback("load", closure.as_ref().unchecked_ref())?;
         closure.forget();
     }
     {
