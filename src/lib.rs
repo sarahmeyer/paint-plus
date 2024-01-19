@@ -7,6 +7,7 @@ use web_sys::*;
 #[wasm_bindgen(start)]
 fn start() -> Result<(), JsValue> {
     let storage_key = "paint-plus";
+    // let id = "paint-plus-image-el";
     let width = 640;
     let height = 480;
     let initial_line_width = 3;
@@ -72,33 +73,35 @@ fn start() -> Result<(), JsValue> {
         .dyn_into::<HtmlImageElement>()
         .unwrap();
 
+    // {
+    //     let context = context.clone();
+    //     let closure = Closure::<dyn FnMut(_)>::new(move |_event: Event| {
+    //         console::log_1(&"image onload".into());
+    //         let image_el_by_id = document.query_selector(&id).unwrap()?;
+    //         context
+    //             .draw_image_with_html_image_element(&image_el_by_id, 0.0, 0.0)
+    //             .unwrap();
+    //     });
+    //     image_el.add_event_listener_with_callback("onload", closure.as_ref().unchecked_ref())?;
+    //     closure.forget();
+    // }
     {
         let context = context.clone();
-        let closure = Closure::<dyn FnMut(_)>::new(move |_event: Event| {
-            console::log_1(&"image onload".into());
-            // context
-            //     .draw_image_with_html_image_element(&image_el, 0.0, 0.0)
-            //     .unwrap();
-        });
-        image_el.add_event_listener_with_callback("onload", closure.as_ref().unchecked_ref())?;
-        closure.forget();
-    }
-    {
-        // let context = context.clone();
-        let closure = Closure::<dyn FnMut(_)>::new(move |_event: Event| {
-            console::log_1(&"load".into());
-            let local_window = web_sys::window().unwrap();
-            let local_storage = local_window.local_storage().unwrap().unwrap();
-            if let Some(stored_image) = local_storage.get_item(storage_key).unwrap() {
-                console::log_1(&"in if".into());
-                image_el.set_src(&stored_image);
-                // move this draw image call to a load event on the image element
-                // context
-                //     .draw_image_with_html_image_element(&image_el, 0.0, 0.0)
-                //     .unwrap();
-            }
-            console::log_1(&"after load".into());
-        });
+        let closure: Closure<dyn FnMut(Event)> =
+            Closure::<dyn FnMut(_)>::new(move |_event: Event| {
+                console::log_1(&"load".into());
+                let local_window = web_sys::window().unwrap();
+                let local_storage = local_window.local_storage().unwrap().unwrap();
+                if let Some(stored_image) = local_storage.get_item(storage_key).unwrap() {
+                    console::log_1(&"in if".into());
+                    image_el.set_src(&stored_image);
+                    // move this draw image call to a load event on the image element
+                    context
+                        .draw_image_with_html_image_element(&image_el, 0.0, 0.0)
+                        .unwrap();
+                }
+                console::log_1(&"after load".into());
+            });
         load_image_button
             .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())?;
         // window()
@@ -114,7 +117,6 @@ fn start() -> Result<(), JsValue> {
                 .unwrap()
                 .dyn_into::<HtmlInputElement>()
                 .unwrap();
-            // console::log_1(&wasm_bindgen::JsValue::from_str(event.data()));
             context.set_stroke_style(&wasm_bindgen::JsValue::from_str(input.value().as_str()));
         });
         color_picker_input
